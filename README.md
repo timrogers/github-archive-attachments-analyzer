@@ -1,3 +1,3 @@
-# GitHub archive attachments analyzer
+# GitHub Archive Attachments Analyzer (GAAA)
 
 TODO
