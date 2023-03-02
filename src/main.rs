@@ -3,6 +3,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct Attachment {
@@ -21,16 +22,30 @@ struct Attachment {
 const INPUT_PATH: &str = "attachments_000001.json";
 const ATTACHMENTS_PATH: &str = "attachments";
 
-fn process_attachments() -> Result<Vec<String>, std::io::Error> {
-    if !Path::new(&INPUT_PATH).exists() || !Path::new(&ATTACHMENTS_PATH).exists() {
-        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", INPUT_PATH, ATTACHMENTS_PATH);
+fn process_attachments(
+    working_directory_path: Option<String>,
+) -> Result<Vec<String>, std::io::Error> {
+    let input_path: PathBuf;
+    let attachments_path: PathBuf;
+
+    if working_directory_path.is_none() {
+        input_path = PathBuf::from(INPUT_PATH);
+        attachments_path = PathBuf::from(ATTACHMENTS_PATH);
+    } else {
+        let path = working_directory_path.as_ref().unwrap();
+        input_path = Path::new(&path).join(INPUT_PATH);
+        attachments_path = Path::new(&path).join(ATTACHMENTS_PATH);
+    }
+
+    if !input_path.exists() || !attachments_path.exists() {
+        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
-    println!("📖 Reading {} to find attachments...", INPUT_PATH);
+    println!("📖 Reading {} to find attachments...", input_path.display());
 
     // Parse the attachments JSON file into a vector of Attachment structs
-    let attachments_json = std::fs::read_to_string(&INPUT_PATH)?;
+    let attachments_json = std::fs::read_to_string(&input_path)?;
     let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
 
     let attachments_count = attachments.len();
@@ -46,10 +61,17 @@ fn process_attachments() -> Result<Vec<String>, std::io::Error> {
                 attachments_count
             );
 
-            let relative_path = attachment.asset_url.replace("tarball://root/", "");
+            let relative_path: PathBuf;
 
-            if !Path::new(&relative_path).exists() {
-                panic!("Could not find listed attachment file `{}`. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", relative_path);
+            if working_directory_path.is_some() {
+                let path = working_directory_path.as_ref().unwrap();
+                relative_path = Path::new(&path).join(attachment.asset_url.replace("tarball://root/", ""));
+            } else {
+                relative_path = PathBuf::from(attachment.asset_url.replace("tarball://root/", ""));
+            }
+
+            if !relative_path.exists() {
+                panic!("Could not find listed attachment file `{}`. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", relative_path.display());
             }
 
             let size = fs::metadata(&relative_path).unwrap().len();
@@ -85,7 +107,7 @@ fn process_attachments() -> Result<Vec<String>, std::io::Error> {
 }
 
 fn main() -> Result<(), std::io::Error> {
-    let result = process_attachments();
+    let result = process_attachments(None);
 
     match result {
         Ok(messages) => {
@@ -98,6 +120,23 @@ fn main() -> Result<(), std::io::Error> {
         Err(e) => {
             eprintln!("Error: {}", e);
             std::process::exit(exitcode::DATAERR);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_identifies_attachments() {
+        let result = super::process_attachments(Some("fixtures".to_string()));
+
+        match result {
+            Ok(val) => {
+                assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144106 bytes"])
+            }
+            Err(e) => {
+                panic!("process_attachments returned an error: {}", e)
+            }
         }
     }
 }
