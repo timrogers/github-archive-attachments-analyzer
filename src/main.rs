@@ -38,7 +38,7 @@ fn process_attachments(
     }
 
     if !input_path.exists() || !attachments_path.exists() {
-        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
+        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
