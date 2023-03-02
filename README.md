@@ -16,6 +16,16 @@ This tool allows you to __identify large attachments in your archives so you can
 1. Open a terminal/command prompt in the extracted directory.
 1. Run `gaaa`. All of the attachments inside your archive will be listed, ordered by size, with a link to the issue/pull request where the attachment is used.
 
+The output looks something like this:
+
+```
+📖 Reading attachments_000001.json to find attachments...
+🔎 Found 1 attachment(s)
+📜 Processing attachment 1/1
+🪣  Sorting attachments by size...
+todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144106 bytes
+```
+
 ## Development
 
 When making changes to this tool's source code locally, you can test it to check that it is working correctly by running `cargo run` inside the `fixtures` directory.
