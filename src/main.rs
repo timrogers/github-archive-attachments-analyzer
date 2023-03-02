@@ -38,7 +38,7 @@ fn process_attachments(
     }
 
     if !input_path.exists() || !attachments_path.exists() {
-        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
+        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
@@ -136,6 +136,20 @@ mod tests {
             }
             Err(e) => {
                 panic!("process_attachments returned an error: {}", e)
+            }
+        }
+    }
+
+    #[test]
+    fn it_errors_if_expected_files_are_not_present() {
+        let result = super::process_attachments(Some("src".to_string()));
+
+        match result {
+            Ok(_val) => {
+                panic!("process_attachments returned a value, but was expected to error");
+            }
+            Err(e) => {
+                assert_eq!(e.to_string(), "Could not find `src/attachments_000001.json` file and/or `src/attachments/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.".to_string());
             }
         }
     }
