@@ -139,4 +139,18 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn it_errors_if_expected_files_are_not_present() {
+        let result = super::process_attachments(Some("src".to_string()));
+
+        match result {
+            Ok(_val) => {
+                panic!("process_attachments returned a value, but was expected to error");
+            }
+            Err(e) => {
+                assert_eq!(e.to_string(), "Could not find `src/attachments_000001.json` file and/or `src/attachments/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.".to_string());
+            }
+        }
+    }
 }
