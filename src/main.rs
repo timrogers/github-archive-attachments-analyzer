@@ -1,5 +1,6 @@
 use byte_unit::Byte;
 use exitcode;
+use glob::glob;
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Error, ErrorKind};
@@ -20,34 +21,70 @@ struct Attachment {
     created_at: String,
 }
 
-const INPUT_PATH: &str = "attachments_000001.json";
-const ATTACHMENTS_PATH: &str = "attachments";
+const FIRST_ATTACHMENTS_METADATA_FILENAME: &str = "attachments_000001.json";
+const ATTACHMENTS_DIRECTORY_NAME: &str = "attachments";
 
-fn process_attachments(
-    working_directory_path: Option<String>,
-) -> Result<Vec<String>, std::io::Error> {
-    let input_path: PathBuf;
-    let attachments_path: PathBuf;
+fn read_attachments_file(path: PathBuf) -> Result<Vec<Attachment>, std::io::Error> {
+    let attachments_json = std::fs::read_to_string(&path)?;
+    let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
 
-    if working_directory_path.is_none() {
-        input_path = PathBuf::from(INPUT_PATH);
-        attachments_path = PathBuf::from(ATTACHMENTS_PATH);
-    } else {
-        let path = working_directory_path.as_ref().unwrap();
-        input_path = Path::new(&path).join(INPUT_PATH);
-        attachments_path = Path::new(&path).join(ATTACHMENTS_PATH);
+    Ok(attachments)
+}
+
+fn read_attachments_files(working_directory: &PathBuf) -> Result<Vec<Attachment>, std::io::Error> {
+    let mut attachments: Vec<Attachment> = Vec::new();
+
+    for entry in glob(
+        &working_directory
+            .join("attachments_*.json")
+            .to_str()
+            .unwrap(),
+    )
+    .unwrap()
+    {
+        match entry {
+            Ok(path) => {
+                let mut file_attachments = read_attachments_file(path)?;
+                attachments.append(&mut file_attachments);
+            }
+            Err(e) => panic!("Unexpected GlobError: {:?}", e),
+        }
     }
 
-    if !input_path.exists() || !attachments_path.exists() {
-        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.", input_path.display(), attachments_path.display());
+    Ok(attachments)
+}
+
+fn get_working_directory(working_directory_path: Option<String>) -> PathBuf {
+    if working_directory_path.is_none() {
+        return PathBuf::from(".");
+    } else {
+        return PathBuf::from(working_directory_path.unwrap());
+    }
+}
+
+fn process_attachments(
+    provided_working_directory: Option<String>,
+) -> Result<Vec<String>, std::io::Error> {
+    let working_directory = get_working_directory(provided_working_directory);
+
+    let first_attachments_metadata_path =
+        working_directory.join(FIRST_ATTACHMENTS_METADATA_FILENAME);
+    let attachments_directory_path = working_directory.join(ATTACHMENTS_DIRECTORY_NAME);
+
+    if !first_attachments_metadata_path.exists() || !attachments_directory_path.exists() {
+        let error_mesage = format!("Could not find `{}` file and/or `{}/` directory. This suggests that either (a) your archive contains no attachments or (b) you're not in a directory created when you extract a GitHub archive.", first_attachments_metadata_path.display(), attachments_directory_path.display());
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
-    eprintln!("📖 Reading {} to find attachments...", input_path.display());
+    eprintln!("📖 Reading attachments metadata files to find attachments...");
 
-    // Parse the attachments JSON file into a vector of Attachment structs
-    let attachments_json = std::fs::read_to_string(&input_path)?;
-    let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
+    let attachments: Vec<Attachment> = match read_attachments_files(&working_directory) {
+        Ok(attachments) => attachments,
+        Err(e) => {
+            let error_mesage = format!("Could not read attachments metadata files: {}", e);
+            return Err(Error::new(ErrorKind::Other, error_mesage));
+        }
+    };
 
     let attachments_count = attachments.len();
     eprintln!("🔎 Found {} attachment(s)", attachments_count);
@@ -62,14 +99,7 @@ fn process_attachments(
                 attachments_count
             );
 
-            let relative_path: PathBuf;
-
-            if working_directory_path.is_some() {
-                let path = working_directory_path.as_ref().unwrap();
-                relative_path = Path::new(&path).join(attachment.asset_url.replace("tarball://root/", ""));
-            } else {
-                relative_path = PathBuf::from(attachment.asset_url.replace("tarball://root/", ""));
-            }
+            let relative_path = Path::new(&working_directory).join(attachment.asset_url.replace("tarball://root/", ""));
 
             if !relative_path.exists() {
                 panic!("Could not find listed attachment file `{}`. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", relative_path.display());
@@ -132,12 +162,29 @@ fn main() -> Result<(), std::io::Error> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_identifies_attachments() {
-        let result = super::process_attachments(Some("fixtures".to_string()));
+    fn it_identifies_attachments_in_single_file() {
+        let result = super::process_attachments(Some("fixtures/single-file".to_string()));
 
         match result {
             Ok(val) => {
                 assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB"])
+            }
+            Err(e) => {
+                panic!("process_attachments returned an error: {}", e)
+            }
+        }
+    }
+
+    #[test]
+    fn it_identifies_attachments_across_multiple_files() {
+        let result = super::process_attachments(Some("fixtures/multiple-files".to_string()));
+
+        match result {
+            Ok(val) => {
+                assert_eq!(val, vec![
+                    "todd-trapani-QldMpmrmWuc-unsplash-2.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB",
+                    "todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB"
+                ])
             }
             Err(e) => {
                 panic!("process_attachments returned an error: {}", e)
