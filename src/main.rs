@@ -1,3 +1,4 @@
+use byte_unit::Byte;
 use exitcode;
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
@@ -42,20 +43,20 @@ fn process_attachments(
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
-    println!("📖 Reading {} to find attachments...", input_path.display());
+    eprintln!("📖 Reading {} to find attachments...", input_path.display());
 
     // Parse the attachments JSON file into a vector of Attachment structs
     let attachments_json = std::fs::read_to_string(&input_path)?;
     let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
 
     let attachments_count = attachments.len();
-    println!("🔎 Found {} attachment(s)", attachments_count);
+    eprintln!("🔎 Found {} attachment(s)", attachments_count);
 
-    let mut attachments_by_size: Vec<(&Attachment, u64)> = attachments
+    let mut attachments_by_size: Vec<(&Attachment, u128)> = attachments
         .iter()
         .enumerate()
         .map(|(index, attachment)| {
-            println!(
+            eprintln!(
                 "📜 Processing attachment {}/{}",
                 index + 1,
                 attachments_count
@@ -74,12 +75,12 @@ fn process_attachments(
                 panic!("Could not find listed attachment file `{}`. Please make sure you're running this tool in the directory created when you extract a GitHub archive.", relative_path.display());
             }
 
-            let size = fs::metadata(&relative_path).unwrap().len();
+            let size = fs::metadata(&relative_path).unwrap().len() as u128;
             return (attachment, size);
         })
-        .collect::<Vec<(&Attachment, u64)>>();
+        .collect::<Vec<(&Attachment, u128)>>();
 
-    println!("🪣  Sorting attachments by size...");
+    eprintln!("🪣  Sorting attachments by size...");
 
     // Sort the attachments by size, largest first. This is done in memory. I haven't figured out how
     // to do an immutable sort yet.
@@ -89,15 +90,19 @@ fn process_attachments(
     // Accumulate the messages to print. We do this instead of directly looping and printing messages as
     // we go becuase it allows us to print warning messages first, before the actual results.
     let messages: Vec<String> = attachments_by_size.iter().fold(Vec::new(), |mut messages, (attachment, size)| {
+        let byte = Byte::from_bytes(*size);
+        let adjusted_byte = byte.get_appropriate_unit(false);
+        let size_as_string = adjusted_byte.format(1);
+
         if attachment.pull_request.is_some()
         {
-            messages.push(format!("{} ({}) - {} bytes", attachment.asset_name, &attachment.pull_request.clone().unwrap(), size));
+            messages.push(format!("{} ({}) - {}", attachment.asset_name, &attachment.pull_request.clone().unwrap(), size_as_string));
         } else if attachment.issue.is_some() {
-            messages.push(format!("{} ({}) - {} bytes", attachment.asset_name, &attachment.issue.clone().unwrap(), size));
+            messages.push(format!("{} ({}) - {}", attachment.asset_name, &attachment.issue.clone().unwrap(), size_as_string));
         } else if attachment.issue_comment.is_some() {
-            messages.push(format!("{} ({}) - {} bytes", attachment.asset_name, &attachment.issue_comment.clone().unwrap(), size));
+            messages.push(format!("{} ({}) - {}", attachment.asset_name, &attachment.issue_comment.clone().unwrap(), size_as_string));
         } else {
-            println!("⚠️ Could not find issue, pull request or issue comment for attachment {}. Skipping...", attachment.asset_name);
+            eprintln!("⚠️ Could not find issue, pull request or issue comment for attachment {}. Skipping...", attachment.asset_name);
         }
 
         return messages;
@@ -132,7 +137,7 @@ mod tests {
 
         match result {
             Ok(val) => {
-                assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144106 bytes"])
+                assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB"])
             }
             Err(e) => {
                 panic!("process_attachments returned an error: {}", e)
