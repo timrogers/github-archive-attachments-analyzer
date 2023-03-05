@@ -42,20 +42,20 @@ fn process_attachments(
         return Err(Error::new(ErrorKind::Other, error_mesage));
     }
 
-    println!("📖 Reading {} to find attachments...", input_path.display());
+    eprintln!("📖 Reading {} to find attachments...", input_path.display());
 
     // Parse the attachments JSON file into a vector of Attachment structs
     let attachments_json = std::fs::read_to_string(&input_path)?;
     let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
 
     let attachments_count = attachments.len();
-    println!("🔎 Found {} attachment(s)", attachments_count);
+    eprintln!("🔎 Found {} attachment(s)", attachments_count);
 
     let mut attachments_by_size: Vec<(&Attachment, u64)> = attachments
         .iter()
         .enumerate()
         .map(|(index, attachment)| {
-            println!(
+            eprintln!(
                 "📜 Processing attachment {}/{}",
                 index + 1,
                 attachments_count
@@ -79,7 +79,7 @@ fn process_attachments(
         })
         .collect::<Vec<(&Attachment, u64)>>();
 
-    println!("🪣  Sorting attachments by size...");
+    eprintln!("🪣  Sorting attachments by size...");
 
     // Sort the attachments by size, largest first. This is done in memory. I haven't figured out how
     // to do an immutable sort yet.
@@ -97,7 +97,7 @@ fn process_attachments(
         } else if attachment.issue_comment.is_some() {
             messages.push(format!("{} ({}) - {} bytes", attachment.asset_name, &attachment.issue_comment.clone().unwrap(), size));
         } else {
-            println!("⚠️ Could not find issue, pull request or issue comment for attachment {}. Skipping...", attachment.asset_name);
+            eprintln!("⚠️ Could not find issue, pull request or issue comment for attachment {}. Skipping...", attachment.asset_name);
         }
 
         return messages;
