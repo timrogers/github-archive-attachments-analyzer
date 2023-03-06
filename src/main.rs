@@ -25,6 +25,7 @@ const FIRST_ATTACHMENTS_METADATA_FILENAME: &str = "attachments_000001.json";
 const ATTACHMENTS_DIRECTORY_NAME: &str = "attachments";
 
 fn read_attachments_file(path: PathBuf) -> Result<Vec<Attachment>, std::io::Error> {
+    eprintln!("Reading attachment file {}", path.display());
     let attachments_json = std::fs::read_to_string(&path)?;
     let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap();
 
