@@ -13,7 +13,7 @@ struct Attachment {
     pull_request: Option<String>,
     issue: Option<String>,
     issue_comment: Option<String>,
-    user: String,
+    user: Option<String>,
     asset_name: String,
     asset_content_type: String,
     asset_url: String,
