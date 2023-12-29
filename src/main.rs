@@ -1,4 +1,4 @@
-use byte_unit::Byte;
+use byte_unit::{Byte, UnitType};
 use exitcode;
 use glob::glob;
 use serde_derive::{Deserialize, Serialize};
@@ -121,9 +121,9 @@ fn process_attachments(
     // Accumulate the messages to print. We do this instead of directly looping and printing messages as
     // we go becuase it allows us to print warning messages first, before the actual results.
     let messages: Vec<String> = attachments_by_size.iter().fold(Vec::new(), |mut messages, (attachment, size)| {
-        let byte = Byte::from_bytes(*size);
-        let adjusted_byte = byte.get_appropriate_unit(false);
-        let size_as_string = adjusted_byte.format(1);
+        let byte = Byte::from_u128(*size).unwrap();
+        let adjusted_byte = byte.get_appropriate_unit(UnitType::Binary);
+        let size_as_string = format!("{adjusted_byte:#.0}");
 
         if attachment.pull_request.is_some()
         {
@@ -168,7 +168,7 @@ mod tests {
 
         match result {
             Ok(val) => {
-                assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB"])
+                assert_eq!(val, vec!["todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 141 KiB"])
             }
             Err(e) => {
                 panic!("process_attachments returned an error: {}", e)
@@ -183,8 +183,8 @@ mod tests {
         match result {
             Ok(val) => {
                 assert_eq!(val, vec![
-                    "todd-trapani-QldMpmrmWuc-unsplash-2.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB",
-                    "todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 144.1 KB"
+                    "todd-trapani-QldMpmrmWuc-unsplash-2.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 141 KiB",
+                    "todd-trapani-QldMpmrmWuc-unsplash.jpg (https://github.com/caffeinesoftware/rewardnights/pull/337) - 141 KiB"
                 ])
             }
             Err(e) => {
