@@ -1,7 +1,7 @@
 use byte_unit::{Byte, UnitType};
 use exitcode;
 use glob::glob;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
